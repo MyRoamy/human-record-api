@@ -1,25 +1,15 @@
-export function cors(req) {
+export function applyCors(req, res) {
   const origin = process.env.WEB_ORIGIN || "*";
+
+  res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Vary", "Origin");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   // Preflight
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        "Access-Control-Allow-Origin": origin,
-        "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-        "Access-Control-Allow-Headers": "content-type",
-        "Access-Control-Max-Age": "86400"
-      }
-    });
+    res.status(204).end();
+    return true;
   }
-
-  return null;
-}
-
-export function withCors(res) {
-  const origin = process.env.WEB_ORIGIN || "*";
-  res.headers.set("Access-Control-Allow-Origin", origin);
-  res.headers.set("Vary", "Origin");
-  return res;
+  return false;
 }
