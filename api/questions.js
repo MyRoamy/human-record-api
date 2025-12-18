@@ -1,21 +1,21 @@
-import { cors, withCors } from "./_cors.js";
-import { db } from "./_db.js";
+import { applyCors } from "./_cors.js";
+import { getSql } from "./_db.js";
 
-export default async function handler(req) {
-  const pre = cors(req);
-  if (pre) return pre;
+export default async function handler(req, res) {
+  if (applyCors(req, res)) return;
+  if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
-  if (req.method !== "GET") {
-    return withCors(new Response("Method not allowed", { status: 405 }));
+  try {
+    const sql = getSql();
+    const rows = await sql`
+      select id, prompt, options
+      from questions
+      where is_active = true
+      order by created_at asc
+    `;
+    return res.status(200).json({ questions: rows });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: String(err?.message || err) });
   }
-
-  const sql = db();
-  const rows = await sql`
-    select id, prompt, options
-    from questions
-    where is_active = true
-    order by created_at asc
-  `;
-
-  return withCors(Response.json({ questions: rows }));
 }
