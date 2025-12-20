@@ -1,9 +1,9 @@
-import { neon } from "@neondatabase/serverless";
+// api/_db.js
+import { neon, neonConfig } from "@neondatabase/serverless";
 
-/**
- * Returns a Neon SQL tagged template function.
- * Prefers HVAC_DATABASE_URL, then falls back to standard Vercel/Neon env vars.
- */
+// Helps in serverless environments (Vercel) by reusing fetch + reducing overhead.
+neonConfig.fetchConnectionCache = true;
+
 export function getSql() {
   const url =
     process.env.HVAC_DATABASE_URL ||
@@ -16,8 +16,5 @@ export function getSql() {
     );
   }
 
-  // Neon serverless driver
-  const sql = neon(url);
-
-  return sql;
+  return neon(url);
 }
