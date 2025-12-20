@@ -13,6 +13,7 @@ export default async function handler(req, res) {
 
     const sql = getSql();
 
+    // Dedupe per session per question
     const existing = await sql`
       select 1
       from answers
