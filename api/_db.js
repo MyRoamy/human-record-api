@@ -1,5 +1,9 @@
 import { neon } from "@neondatabase/serverless";
 
+/**
+ * Returns a Neon SQL tagged template function.
+ * Prefers HVAC_DATABASE_URL, then falls back to standard Vercel/Neon env vars.
+ */
 export function getSql() {
   const url =
     process.env.HVAC_DATABASE_URL ||
@@ -12,5 +16,8 @@ export function getSql() {
     );
   }
 
-  return neon(url);
+  // Neon serverless driver
+  const sql = neon(url);
+
+  return sql;
 }
