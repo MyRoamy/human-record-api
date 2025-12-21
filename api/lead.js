@@ -1,6 +1,6 @@
 // api/lead.js
 import { applyCors } from "./_cors.js";
-import { getSql, ensureSchema, ensureSession } from "./_db.js";
+import { getSql } from "./_db.js";
 
 function norm(s) {
   if (s === undefined || s === null) return null;
@@ -28,10 +28,8 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    const sql = getSql();
-    await ensureSchema(sql);
-
     const body = req.body || {};
+    const sql = getSql();
 
     const sessionId = norm(body.sessionId);
     const serviceType = norm(body.service_type);
@@ -45,8 +43,12 @@ export default async function handler(req, res) {
       });
     }
 
-    // Ensure session exists (so FK doesn't fail)
-    await ensureSession(sql, req, sessionId, null, norm(req.headers["user-agent"]));
+    // Ensure session exists
+    await sql`
+      insert into sessions (id)
+      values (${sessionId})
+      on conflict (id) do nothing
+    `;
 
     const fullName = norm(body.full_name);
     const email = norm(body.email);
@@ -60,19 +62,15 @@ export default async function handler(req, res) {
 
     const diagnostic = safeJson(body.diagnostic);
 
-    const id = crypto.randomUUID();
-
     const lead = await sql`
       insert into leads (
-        id,
         session_id, source, service_type, urgency, issue_summary, budget_range,
         address1, address2, city, state, zip,
         full_name, phone, email, preferred_contact, consent,
         diagnostic
       )
       values (
-        ${id}::uuid,
-        ${sessionId}::uuid,
+        ${sessionId},
         ${norm(body.source) || "webflow"},
         ${serviceType},
         ${urgency},
@@ -88,7 +86,7 @@ export default async function handler(req, res) {
         ${email},
         ${norm(body.preferred_contact) || "call"},
         ${consent},
-        ${diagnostic}::jsonb
+        ${diagnostic}
       )
       returning id, created_at, status
     `;
