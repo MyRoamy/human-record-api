@@ -1,30 +1,36 @@
-import crypto from "crypto";
+// api/session.js
 import { applyCors } from "./_cors.js";
-import { getSql } from "./_db.js";
+import { getSql, ensureSchema, ensureSession } from "./_db.js";
 
-function sha256(x) {
-  return crypto.createHash("sha256").update(x).digest("hex");
+function norm(v) {
+  if (v === undefined || v === null) return null;
+  const t = String(v).trim();
+  return t.length ? t : null;
 }
 
 export default async function handler(req, res) {
   if (applyCors(req, res)) return;
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
 
   try {
-    const { sessionId, timezone, userAgent } = req.body || {};
-    if (!sessionId) return res.status(400).json({ error: "Missing sessionId" });
-
-    const ip = (req.headers["x-forwarded-for"] || "").split(",")[0].trim();
-    const ipHash = ip ? sha256(ip) : null;
-
     const sql = getSql();
-    await sql`
-      insert into sessions (id, timezone, user_agent, ip_hash)
-      values (${sessionId}, ${timezone || null}, ${userAgent || null}, ${ipHash})
-      on conflict (id) do nothing
-    `;
+    await ensureSchema(sql);
 
-    return res.status(200).json({ ok: true });
+    const body = req.body || {};
+    const sessionId = norm(body.sessionId) || crypto.randomUUID();
+
+    await ensureSession(
+      sql,
+      req,
+      sessionId,
+      norm(body.timezone),
+      norm(body.userAgent) || norm(req.headers["user-agent"])
+    );
+
+    return res.status(200).json({ ok: true, sessionId });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: String(err?.message || err) });
