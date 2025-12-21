@@ -1,8 +1,0 @@
-{
-  "name": "human-record-api",
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "@neondatabase/serverless": "^0.10.0"
-  }
-}
