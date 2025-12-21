@@ -1,0 +1,8 @@
+{
+  "name": "human-record-api",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "postgres": "^3.4.5"
+  }
+}
