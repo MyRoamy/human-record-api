@@ -1,6 +1,6 @@
 // api/session.js
 import { applyCors } from "./_cors.js";
-import { getSql, ensureSchema, ensureSession } from "./_db.js";
+import { getSql } from "./_db.js";
 
 function norm(v) {
   if (v === undefined || v === null) return null;
@@ -16,21 +16,21 @@ export default async function handler(req, res) {
   }
 
   try {
-    const sql = getSql();
-    await ensureSchema(sql);
-
     const body = req.body || {};
-    const sessionId = norm(body.sessionId) || crypto.randomUUID();
+    const sessionId = norm(body.sessionId);
+    if (!sessionId) return res.status(400).json({ error: "Missing sessionId" });
 
-    await ensureSession(
-      sql,
-      req,
-      sessionId,
-      norm(body.timezone),
-      norm(body.userAgent) || norm(req.headers["user-agent"])
-    );
+    const sql = getSql();
 
-    return res.status(200).json({ ok: true, sessionId });
+    await sql`
+      insert into sessions (id, timezone, user_agent)
+      values (${sessionId}, ${norm(body.timezone)}, ${norm(body.userAgent)})
+      on conflict (id) do update
+      set timezone = coalesce(excluded.timezone, sessions.timezone),
+          user_agent = coalesce(excluded.user_agent, sessions.user_agent)
+    `;
+
+    return res.status(200).json({ ok: true });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: String(err?.message || err) });
