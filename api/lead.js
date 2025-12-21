@@ -1,6 +1,6 @@
 // api/lead.js
 import { applyCors } from "./_cors.js";
-import { getSql } from "./_db.js";
+import { getSql, ensureSchema, ensureSession } from "./_db.js";
 
 function norm(s) {
   if (s === undefined || s === null) return null;
@@ -14,19 +14,12 @@ function digitsOnly(v) {
 
 function safeJson(v) {
   if (v === undefined || v === null) return null;
-  // Allow object/array directly
   if (typeof v === "object") return v;
-  // Allow JSON string
   if (typeof v === "string") {
     const t = v.trim();
     if (!t) return null;
-    try {
-      return JSON.parse(t);
-    } catch {
-      return { raw: t };
-    }
+    try { return JSON.parse(t); } catch { return { raw: t }; }
   }
-  // Fallback
   return { raw: String(v) };
 }
 
@@ -35,28 +28,28 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    const body = req.body || {};
     const sql = getSql();
+    await ensureSchema(sql);
+
+    const body = req.body || {};
 
     const sessionId = norm(body.sessionId);
     const serviceType = norm(body.service_type);
     const urgency = norm(body.urgency);
     const zip = norm(body.zip);
-
     const consent = body.consent === true;
 
-    // Minimum required for a lead
     if (!sessionId || !serviceType || !urgency || !zip) {
       return res.status(400).json({
         error: "Missing required fields (sessionId, service_type, urgency, zip)."
       });
     }
 
-    // Contact fields
+    // Ensure session exists (so FK doesn't fail)
+    await ensureSession(sql, req, sessionId, null, norm(req.headers["user-agent"]));
+
     const fullName = norm(body.full_name);
     const email = norm(body.email);
-
-    // Store digits-only (recommended). If you pass formatted, we strip it here.
     const phoneDigits = digitsOnly(body.phone);
     const phone = phoneDigits ? phoneDigits : null;
 
@@ -65,18 +58,21 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Consent must be true to store contact details." });
     }
 
-    // Diagnostic JSON payload (answers / summary of questionnaire)
     const diagnostic = safeJson(body.diagnostic);
+
+    const id = crypto.randomUUID();
 
     const lead = await sql`
       insert into leads (
+        id,
         session_id, source, service_type, urgency, issue_summary, budget_range,
         address1, address2, city, state, zip,
         full_name, phone, email, preferred_contact, consent,
         diagnostic
       )
       values (
-        ${sessionId},
+        ${id}::uuid,
+        ${sessionId}::uuid,
         ${norm(body.source) || "webflow"},
         ${serviceType},
         ${urgency},
@@ -92,7 +88,7 @@ export default async function handler(req, res) {
         ${email},
         ${norm(body.preferred_contact) || "call"},
         ${consent},
-        ${diagnostic}
+        ${diagnostic}::jsonb
       )
       returning id, created_at, status
     `;
