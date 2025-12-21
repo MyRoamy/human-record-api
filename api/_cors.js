@@ -1,16 +1,11 @@
 // api/_cors.js
 export function applyCors(req, res) {
-  // Adjust origins as needed (Webflow + your custom domain)
-  const origin = req.headers.origin || "*";
-
-  res.setHeader("Access-Control-Allow-Origin", origin);
-  res.setHeader("Vary", "Origin");
+  res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "content-type, authorization");
-  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
   if (req.method === "OPTIONS") {
-    res.status(204).end();
+    res.status(200).end();
     return true;
   }
   return false;
